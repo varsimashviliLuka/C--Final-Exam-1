@@ -17,18 +17,16 @@ class Program
         var account1 = new BankAccount()
         {
             FirstName = "Luka", LastName = "Varsimashvili",
-            CardDetails = new CardDetail(){CardNumber = "123456", CardValidDate = "123", CVC = "123",},
-            Pin = "123"
+            CardDetails = new CardDetail(){CardNumber = "123456789101112", CardValidDate = "01/28", CVC = "000",},
+            Pin = "1234"
         };
         var account2 = new BankAccount()
         {
-            FirstName = "Test", LastName = "Testa",
-            CardDetails = new CardDetail(){CardNumber = "1234567", CardValidDate = "123", CVC = "123",},
-            Pin = "123"
+            FirstName = "Saba", LastName = "Machavariani",
+            CardDetails = new CardDetail(){CardNumber = "378936521489", CardValidDate = "05/29", CVC = "383",},
+            Pin = "5678"
         };
-        Transaction t1 = new Transaction() { TransactionType = "TopUpBalance", AmountGEL = 100 };
-        var ts = new List<Transaction>() { t1 };
-        account1.Transactions = ts;
+
         accounts.Add(account1);
         accounts.Add(account2);*/
         startApp(accounts, logger);
@@ -36,7 +34,7 @@ class Program
     }
     
 
-    static void startApp(List<BankAccount> bankAccounts, Logger logger)
+    static void startApp(List<BankAccount>? bankAccounts, Logger logger)
     {
         logger.Log("App Started");
         Console.WriteLine("Welcome To ATM, Please Log In To Your Account! ");
@@ -167,6 +165,35 @@ class Program
                             Console.WriteLine("Incorrect Old PIN");
                         }
                         break;
+                    case 6:
+                        Console.WriteLine("Please Enter Currency You Want To Sell (1,2,3): \n1. GEL\n2. USD\n3. EUR");
+                        var input1 = Console.ReadLine();
+                        Console.WriteLine("Please Enter Currency You Want To Purchase (1,2,3): \n1. GEL\n2. USD\n3. EUR");
+                        var input2 = Console.ReadLine();
+                        if (int.TryParse(input1, out var currencyFrom) && currencyFrom >= 1 && currencyFrom <= 3 && int.TryParse(input2,out var currencyTo) && currencyTo >= 1 && currencyTo<=3)
+                        {
+                            Console.WriteLine("Please Type Amount To Purchase");
+                            if (decimal.TryParse(Console.ReadLine(), out var purchase))
+                            {
+                                var (message, status) = myAccount.exchangeCurrency(currencyFrom,currencyTo, purchase);
+                                if (!status)
+                                {
+                                    logger.Log($"Trying To Exchange Money | {message} ({myAccount.FirstName} {myAccount.LastName})");
+                                    Console.WriteLine($"Couldn't Exchange Money | {message}");
+                                }
+                                else
+                                {
+                                    logger.Log($"Money Exchanged {message}");
+                                    Console.WriteLine($"{message}");
+                                }
+                            }
+                            else
+                            {
+                                logger.Log($"Trying To Exchange Money | Invalid Amount Input ({myAccount.FirstName} {myAccount.LastName})");
+                                Console.WriteLine("Invalid Amount Input");
+                            }
+                        }
+                        break;
                 }
                 saveJson(logger, bankAccounts);
             }
@@ -180,7 +207,7 @@ class Program
         
     }
 
-    static (bool loggedIn, BankAccount myAccount) login(List<BankAccount> bankAccounts, Logger logger)
+    static (bool loggedIn, BankAccount myAccount) login(List<BankAccount>? bankAccounts, Logger logger)
     {
         var loggedIn = false;
         BankAccount myAccount = new BankAccount(){FirstName = "",LastName = "",
@@ -195,6 +222,12 @@ class Program
             var cardValidDate = Console.ReadLine();
             Console.WriteLine("Please Enter Card CVC (000): ");
             var CVC = Console.ReadLine();
+
+            if (bankAccounts is null)
+            {
+                Console.WriteLine("Invalid Bank Details");
+                continue;
+            }
 
             var filtered = bankAccounts.Where(x => x.CardDetails.ValidateCardNumber(cardNumber) &&
                                                    x.CardDetails.ValidateCardValidDate(cardValidDate) &&
@@ -243,17 +276,33 @@ class Program
         File.WriteAllText(filePath,json);
         
     }
-    static List<BankAccount> getBankAccounts(Logger logger, string filePath = "./BankAccounts.json")
+    static List<BankAccount>? getBankAccounts(Logger logger, string filePath = "./BankAccounts.json")
     {
+        if (!File.Exists(filePath))
+        {
+            logger.Log($"File Does Not Exist, Creating File  {filePath}");
+            File.Create(filePath).Close();
+        }
+
         using (StreamReader r = new StreamReader(filePath))
         {
             
             logger.Log($"Reading JSON File ({filePath})");
             
+            List<BankAccount> accounts = null;
             var json = r.ReadToEnd();
-            List<BankAccount> accounts = JsonSerializer.Deserialize<List<BankAccount>>(json);
-            logger.Log($"JSON Successfully Deserialized ({filePath})");
+            try
+            {
+                accounts = JsonSerializer.Deserialize<List<BankAccount>>(json);
+                logger.Log($"JSON Successfully Deserialized ({filePath})");
+            }
+            catch
+            {
+                logger.Log($"JSON Deserialization Failed, No Data Found! ({filePath})");
+                
+            }
             return accounts;
+            
         }
         
         

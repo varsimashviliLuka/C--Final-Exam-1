@@ -12,6 +12,13 @@ public class BankAccount
 
     private Dictionary<int,string> CURRENCY = new Dictionary<int, string>() {{1, "GEL"}, {2, "USD"}, {3, "EUR"}};
 
+    private Dictionary<string, decimal> EXCHANGE_RATES = new Dictionary<string, decimal>()
+    {
+        {"GEL", 1},
+        {"USD", 0.38m},
+        {"EUR", 0.33m}
+    };
+
     // 1
     public Transaction? checkDeposit()
     {
@@ -37,6 +44,13 @@ public class BankAccount
         }
 
         var latestTransaction = getLatestTransaction();
+        if (latestTransaction is null)
+        {
+            message = "No Latest Transaction Found!";
+            status = false;
+            return (message, status);
+        }
+
         var newTransaction = createTransaction("Get Amount");
         
         message = "Insufficient Funds";
@@ -139,32 +153,90 @@ public class BankAccount
     
     // 6
 
-    public string exchangeCurrency(int fromCurrency, int toCurrency, decimal purchase)
+    public (string, bool) exchangeCurrency(int fromCurrency, int toCurrency, decimal purchase)
     {
+        var status = false;
         var message = "Incorrect Currency Index";
         if (!CURRENCY.TryGetValue(fromCurrency, out var fromCur) || !CURRENCY.TryGetValue(toCurrency, out var toCur) )
         {
-            return message;
+            return (message, status);
         }
-        
 
+        message = "No Latest Transaction Found!";
         var newTransaction = createTransaction("Exchange Currency");
-
+        var latestTransaction = getLatestTransaction();
+        if (latestTransaction is null)
+        {
+            return (message,status);
+        }
+        message = "Insufficient Funds";
+        
+        var converted = purchase / EXCHANGE_RATES[toCur];
+        
         switch (fromCur)
         {
             case "GEL":
+                if (latestTransaction.AmountGEL < converted)
+                {
+                    return (message, status);
+                }
                 switch (toCur)
                 {
                     case "USD":
-                        
+                        newTransaction.AmountUSD += purchase;
                         break;
                     case "EUR":
+                        newTransaction.AmountEUR += purchase;
+                        break;
+                    case "GEL":
+                        newTransaction.AmountGEL += purchase;
                         break;
                 }
+                newTransaction.AmountGEL -= converted;
+                break;
+            case "USD":
+                if (latestTransaction.AmountUSD / EXCHANGE_RATES[fromCur] < converted)
+                {
+                    return (message, status);
+                }
+                switch (toCur)
+                {
+                    case "GEL":
+                        newTransaction.AmountGEL += purchase;
+                        break;
+                    case "EUR":
+                        newTransaction.AmountEUR += purchase;
+                        break;
+                    case "USD":
+                        newTransaction.AmountUSD += purchase;
+                        break;
+                }
+                newTransaction.AmountUSD -= converted * EXCHANGE_RATES[fromCur];
+                break;
+            case "EUR":
+                if (latestTransaction.AmountEUR / EXCHANGE_RATES[fromCur] < converted)
+                {
+                    return (message, status);
+                }
+                switch (toCur)
+                {
+                    case "GEL":
+                        newTransaction.AmountGEL += purchase;
+                        break;
+                    case "USD":
+                        newTransaction.AmountUSD += purchase;
+                        break;
+                    case "EUR":
+                        newTransaction.AmountEUR += purchase;
+                        break;
+                }
+                newTransaction.AmountEUR -= converted * EXCHANGE_RATES[fromCur];
                 break;
         }
 
-        return message;
+        message = $"Successfully Sold {fromCur}{converted} | Bought {toCur}{purchase}";
+        addTransaction(newTransaction);
+        return (message,status);
     }
 
     // Helper Functions
